@@ -14,6 +14,20 @@ from model import MedGCN, MultiMatLoss
 
 from preparedata import * 
 
+# inductive setting
+train_adj_mats={(0,1): [to_dense(enc_pat_adj)[med_train_val_idx]],
+          (0,2): [to_dense(enc_lab_adj)[med_train_val_idx]],
+          (0,3): [to_dense(enc_med_adj)[med_train_val_idx]],
+         }
+
+masks = train_adj_masks
+
+train_adj_masks = {   (0, 2): [to_dense(train_mask_enc_lab)[med_train_val_idx].cuda()], (0, 3): [train_mask_enc_med[med_train_val_idx].cuda()] }
+
+train_fea_mats={0: to_dense(enc_feat)[med_train_val_idx], 1: pat_feat, 2: lab_feat, 3: med_feat}
+
+
+
 epochs=1000
 n_iter_no_change=50
 
