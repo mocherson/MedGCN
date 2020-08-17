@@ -6,11 +6,14 @@ import torch
 from sklearn.model_selection import ShuffleSplit
 from utility.preprocessing import *
 
-
-path = '~/MedGCN/data/'
+# replace the data
+path = './data/'
 enc_pat = pd.read_csv(path+'inter_enc_pat.csv',index_col=0)
 enc_lab = pd.read_csv(path+'inter_enc_lab.csv',index_col=0)
 enc_med = pd.read_csv(path+'inter_enc_med.csv',index_col=0)
+enc_date = pd.read_csv(path+'enc_date.csv',index_col=0)
+pat = enc_date['patient_ir_id'].unique()
+enc_latest = enc_date.reset_index().groupby('patient_ir_id').apply(lambda x: x.iloc[x['encounter_start_date'].values.argmax()])
 
 enc_lab = maxminnorm(enc_lab)
 
@@ -37,15 +40,20 @@ adj_mats={(0,1): [enc_pat_adj],
 fea_mats={0: enc_feat, 1: pat_feat, 2: lab_feat, 3: med_feat}
 fea_num = {0: n_enc, 1: n_pat, 2: n_lab, 3: n_med}
 
-adj_losstype = { (0, 1): [('BCE',0)],   (0, 2): [('MSE',1)],   (0, 3): [('BCE',1)] }
 
 
 # medicine recommendation
 ss = ShuffleSplit(n_splits=1, test_size=0.2, random_state=123)
 ss1 = ShuffleSplit(n_splits=1, test_size=0.1, random_state=12345)
-med_train_val_idx, med_test_idx =next(ss.split(enc_med))
-train_idx, val_idx =next(ss1.split(med_train_val_idx))
-med_train_idx, med_val_idx = med_train_val_idx[train_idx], med_train_val_idx[val_idx]
+pat_train_val_idx, pat_test_idx =next(ss.split(pat))
+train_idx, val_idx =next(ss1.split(pat_train_val_idx))
+pat_train_idx, pat_val_idx = pat_train_val_idx[train_idx], pat_train_val_idx[val_idx]
+pat_train, pat_val, pat_test = pat[pat_train_idx],pat[pat_val_idx],pat[pat_test_idx]
+enc_train, enc_val, enc_test = enc_latest.loc[pat_train,'encounter_ir_id'],enc_latest.loc[pat_val,'encounter_ir_id'],enc_latest.loc[pat_test,'encounter_ir_id']
+enc_val, enc_test = enc_latest.loc[pat_val,'encounter_ir_id'],enc_latest.loc[pat_test,'encounter_ir_id']
+med_val_idx, med_test_idx = np.where(enc_med.index.isin(enc_val))[0], np.where(enc_med.index.isin(enc_test))[0] 
+med_train_idx = np.array([i for i in range(len(enc_med.index)) if i not in med_val_idx and i not in med_test_idx ])
+med_train_val_idx = np.hstack((med_train_idx,med_val_idx))
 
 train_mask_enc_med=torch.zeros(enc_med_adj.shape)
 train_mask_enc_med[med_train_idx]=1
@@ -59,6 +67,7 @@ test_mask_enc_med[med_test_idx]=1
 # test_adj_masks = {    (0, 3): [test_mask_enc_med.cuda()] }
 # edge_decoder = {    (0, 3): ('linear',1) }
 tasks=((0,3), (0,2))
+# tasks=((0,2),)
 
 
 # # lab estimation,  matrix completion

@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 
 from torch import nn, optim
@@ -14,12 +16,21 @@ from model import MedGCN, MultiMatLoss
 
 from preparedata import * 
 
-epochs=1000
-n_iter_no_change=50
+parser = argparse.ArgumentParser(description='Training and evaluating the MedGCN')
+parser.add_argument('--lamb', type=float, default=1, help='regularization parameter for lab error')
+parser.add_argument('--layers', type=int, default=1, help='GCN layers')
+args = parser.parse_args()
 
-medgcn =  MedGCN(fea_num,( 300,  ), tasks, dropout=0.1).cuda()
+torch.manual_seed(123)
+
+epochs=300
+# n_iter_no_change=50
+
+adj_losstype = { (0, 1): [('BCE',0)],   (0, 2): [('MSE',args.lamb)],   (0, 3): [('BCE',1)] }
+
+medgcn =  MedGCN(fea_num,( 300,  )*args.layers, tasks, dropout=0.0).cuda()
 optimizer = optim.Adam(medgcn.parameters(), lr=1e-3)
-lossfun = MultiMatLoss().cuda()
+lossfun = MultiMatLoss(pos_weight=None).cuda()
 # scheduler = ReduceLROnPlateau(optimizer, 'min')
 
 # training-validation-test
@@ -84,27 +95,25 @@ for epoch in range(epochs):
         v_mse.append(val_mse)
         te_mse.append(test_mse)
         
-        print('------', adj_recon[(0,2)][0][med_test_idx][37,184])
+#     if val_loss<=best_val_loss:
+#         best_val_loss=val_loss
+#         best_epoch=epoch
         
-    if val_loss<=best_val_loss:
-        best_val_loss=val_loss
-        best_epoch=epoch
+#     if test_mse<=best_val_mse:
+#         best_val_mse=test_mse
+#         save_obj(adj_recon[(0,2)][0].cpu().numpy(), 'est_lab2.pkl')
+#         best_epoch=epoch
         
-    if test_mse<=best_val_mse:
-        best_val_mse=test_mse
-        save_obj(adj_recon[(0,2)][0].cpu().numpy(), 'est_lab2.pkl')
-        # best_epoch=epoch
-        
-    if test_lrap>=best_val_lrap:
-        best_val_lrap=test_lrap
-        save_obj(adj_recon[(0,3)][0].cpu().numpy(), 'rec_med2.pkl')
-        # best_epoch=epoch
+#     if test_lrap>=best_val_lrap:
+#         best_val_lrap=test_lrap
+#         save_obj(adj_recon[(0,3)][0].cpu().numpy(), 'rec_med2.pkl')
+#         best_epoch=epoch
 
-    if epoch-best_epoch>n_iter_no_change:
-        break
+#     if epoch-best_epoch>n_iter_no_change:
+#         break
     
 res=pd.DataFrame({   'tr_loss': tr_loss, 'v_loss': v_loss, 
                   'v_mapk': v_mapk,'te_mapk': te_mapk, 'v_lrap': v_lrap, 'te_lrap': te_lrap,
                   'v_mse': v_mse, 'te_mse': te_mse
                  })
-# res.to_csv('res_Med_0.5lab.csv')
+# res.to_csv('res_Med_lab%s.csv'%(args.lamb))

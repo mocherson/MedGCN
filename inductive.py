@@ -25,13 +25,14 @@ masks = train_adj_masks
 train_adj_masks = {   (0, 2): [to_dense(train_mask_enc_lab)[med_train_val_idx].cuda()], (0, 3): [train_mask_enc_med[med_train_val_idx].cuda()] }
 
 train_fea_mats={0: to_dense(enc_feat)[med_train_val_idx], 1: pat_feat, 2: lab_feat, 3: med_feat}
+adj_losstype = { (0, 1): [('BCE',0)],   (0, 2): [('MSE',1)],   (0, 3): [('BCE',1)] }
 
 
 
-epochs=1000
+epochs=300
 n_iter_no_change=50
 
-medgcn =  MedGCN(fea_num,( 300,  ), tasks, dropout=0.1).cuda()
+medgcn =  MedGCN(fea_num,( 100,  ), tasks, dropout=0.1).cuda()
 optimizer = optim.Adam(medgcn.parameters(), lr=1e-3)
 lossfun = MultiMatLoss().cuda()
 # scheduler = ReduceLROnPlateau(optimizer, 'min')
@@ -99,22 +100,22 @@ for epoch in range(epochs):
         te_mse.append(test_mse)
         
         
-    if val_loss<=best_val_loss:
-        best_val_loss=val_loss
-        best_epoch=epoch
+#     if val_loss<=best_val_loss:
+#         best_val_loss=val_loss
+#         best_epoch=epoch
         
-    if test_mse<=best_val_mse:
-        best_val_mse=test_mse
-        save_obj(adj_recon[(0,2)][0].cpu().numpy(), 'est_lab2.pkl')
-        best_epoch=epoch
+#     if test_mse<=best_val_mse:
+#         best_val_mse=test_mse
+#         save_obj(adj_recon[(0,2)][0].cpu().numpy(), 'est_lab2.pkl')
+#         best_epoch=epoch
         
-    if test_lrap>=best_val_lrap:
-        best_val_lrap=test_lrap
-        save_obj(adj_recon[(0,3)][0].cpu().numpy(), 'rec_med2.pkl')
-        best_epoch=epoch
+#     if test_lrap>=best_val_lrap:
+#         best_val_lrap=test_lrap
+#         save_obj(adj_recon[(0,3)][0].cpu().numpy(), 'rec_med2.pkl')
+#         best_epoch=epoch
 
-    if epoch-best_epoch>n_iter_no_change:
-        break
+#     if epoch-best_epoch>n_iter_no_change:
+#         break
     
 res=pd.DataFrame({   'tr_loss': tr_loss, 'v_loss': v_loss, 
                   'v_mapk': v_mapk,'te_mapk': te_mapk, 'v_lrap': v_lrap, 'te_lrap': te_lrap,
